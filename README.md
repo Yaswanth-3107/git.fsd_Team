@@ -34,4 +34,4 @@ npm i
 ```bash
 npm run start
 ```
-5. [GitHub link](https://github.com/Navaneeth-22/git.fsd_Team)
+5. [GitHub link](https://github.com/Yaswanth-3107/git.fsd_Team)
