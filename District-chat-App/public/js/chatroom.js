@@ -143,6 +143,7 @@ function getAllMessages(chatId) {
     success: function (data) {
       console.log(data);
       appendmessageHtml(data);
+      scrollToBottom(false);
     },
     error: function (data) {
       alert("Login Failed" + data.message);
@@ -154,6 +155,7 @@ $("body").on("click", ".groups", function () {
   selectedChatId = $(this).attr("id");
 
   getAllMessages(selectedChatId);
+
   let info = {
     chatId: selectedChatId,
     user: userLoggedIn,
@@ -166,6 +168,9 @@ $("body").on("click", ".groups", function () {
 $("#messageSendBut").click(() => {
   sendMessage();
 });
+$("#complaintBut").click(() => {
+  sendComplaint();
+});
 $("#inputmessageId").keydown((event) => {
   updateTyping();
 
@@ -174,7 +179,17 @@ $("#inputmessageId").keydown((event) => {
     return false;
   }
 });
-
+/*$("body").on("click", "#forwardMessageId", () => {
+  console.log("clivvj");
+  $(".layout-wrapper").append(`<div class="modal-body">
+  <h5>Popover in a modal</h5>
+  <p>This <a href="#" role="button" class="btn btn-secondary popover-test" title="Popover title" data-content="Popover body content is set in this attribute.">button</a> triggers a popover on click.</p>
+  <hr>
+  <h5>Tooltips in a modal</h5>
+  <p><a href="#" class="tooltip-test" title="Tooltip">This link</a> and <a href="#" class="tooltip-test" title="Tooltip">that link</a> have tooltips on hover.</p>
+</div>`);
+});
+*/
 function updateTyping() {
   if (!connected) return;
 
@@ -308,6 +323,7 @@ function sendMessage() {
       url: "http://localhost:3000/api/postMessages",
       data: JSON.stringify({
         content: content,
+        boolComp: false,
         chatId: selectedChatId,
       }),
       headers: {
@@ -331,6 +347,48 @@ function sendMessage() {
     });
   }
 }
+function sendComplaint() {
+  let heading = $("#headingId").val().trim();
+  let complaint = $("#complaintId").val().trim();
+  let address = $("#addressId").val().trim();
+
+  let sessionId = getCookie("SESSIONID");
+  if (heading != "" && complaint != "" && address != "") {
+    $.ajax({
+      type: "POST",
+      url: "http://localhost:3000/api/postMessages",
+      data: JSON.stringify({
+        heading: heading,
+        complaint: complaint,
+        address: address,
+        boolComp: true,
+        chatId: selectedChatId,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${sessionId}`,
+      },
+      success: function (message) {
+        console.log(message);
+        // appendmessageHtml(message);
+        addCurrentMessage(message);
+        scrollToBottom(true);
+        socketio.emit("new message", message);
+        gettingChatData();
+        $("#headingId").val("");
+        $("#complaintId").val("");
+        $("#addressId").val("");
+      },
+      error: function (data) {
+        alert("Could not send message");
+        $("#headingId").val(heading);
+        $("#complaintId").val(complaint);
+        $("#addressId").val(address);
+        return;
+      },
+    });
+  }
+}
 
 const appendmessageHtml = (data) => {
   $(".chatMessages").empty();
@@ -348,6 +406,20 @@ const appendmessageHtml = (data) => {
       leftMessage = 1;
       rightMessage = 0;
     }
+    let complaint;
+    let message;
+    if (x.boolComp === true) {
+      complaint = `<p class="mb-0" style= "line-break:anywhere;text-align: justify;">${x?.complaint?.heading}</p>
+      <br>
+      <p class="mb-0" style= "line-break:anywhere;text-align: justify;">${x?.complaint?.content}</p>
+      <br>
+      <p class="mb-0" style= "line-break:anywhere;text-align: justify;">${x?.complaint?.address}</p>
+
+      `;
+    } else {
+      message = `<p class="mb-0" style= "line-break:anywhere;text-align: justify;">${x?.content}</p>`;
+    }
+
     $(".chatMessages").append(
       `<li class=${rightMessage === 1 ? "right-message" : "left-message"}>
       <div class="conversation-list">
@@ -363,9 +435,8 @@ const appendmessageHtml = (data) => {
           <div class="ctext-wrap">
             <div class="ctext-wrap-content" style="
             max-width: 320px;">
-              <p class="mb-0" style= "line-break:anywhere;text-align: justify;">${
-                x?.content
-              }</p>
+            ${complaint ? complaint : message}
+              
               <p class="chat-time mb-0">
                 <i class="ri-time-line align-middle"></i>
                 <span class="align-middle">${time}</span>
@@ -383,25 +454,57 @@ const appendmessageHtml = (data) => {
                 <i class="ri-more-2-fill"></i>
               </a>
               <div class="dropdown-menu">
-                <a class="dropdown-item" href="#"
+                <a class="dropdown-item" id="copyMessageId"
                   >Copy
                   <i
                     class="ri-file-copy-line float-end text-muted"
                   ></i
                 ></a>
-                <a class="dropdown-item" href="#"
+                <a class="dropdown-item" id="saveMessageId"
                   >Save
                   <i
                     class="ri-save-line float-end text-muted"
                   ></i
                 ></a>
-                <a class="dropdown-item" href="#"
+               
+       
+                <a class="dropdown-item" id="forwardMessageId" data-bs-toggle="modal" data-bs-target="#myModal1"
                   >Forward
-                  <i
-                    class="ri-chat-forward-line float-end text-muted"
-                  ></i
+                  <div class="modal" id="myModal1">
+                  <div class="modal-dialog">
+                      <div class="modal-content">
+                          <div class="modal-header">
+                              <h5 class="modal-title">Enter Complaint</h5>
+                              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                          </div>
+                          <div class="modal-body">
+                              <form>
+                                  <div class="mb-3">
+                                      <label class="form-label required">Heading</label>
+                                      <textarea class="form-control" id="headingId"></textarea>
+                                  </div>
+                                  <div class="mb-3">
+                                      <label class="form-label required">Complaint</label>
+                                      <textarea class="form-control" id="complaintId"></textarea>
+                                  </div>
+                                  <div class="mb-3">
+                                      <label class="form-label required">Address</label>
+                                      <textarea class="form-control" id="addressId"></textarea>
+                                  </div>
+                              </form>
+                          </div>
+                          <div class="modal-footer">
+                              <button type="submit" class="btn btn-primary" id="complaintBut">Submit</button>
+                              <button type="submit" class="btn btn-danger">Cancel</button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              <i
+              class="ri-chat-forward-line float-end text-muted"
+            ></i
                 ></a>
-                <a class="dropdown-item" href="#"
+                <a class="dropdown-item" id="deleteMessageId"
                   >Delete
                   <i
                     class="ri-delete-bin-line float-end text-muted"
@@ -430,6 +533,19 @@ function addCurrentMessage(x) {
     rightMessage = 0;
   }
   if (x.chat._id === selectedChatId) {
+    let complaint;
+    let message;
+    if (x.boolComp === true) {
+      complaint = `<p class="mb-0" style= "line-break:anywhere;text-align: justify;">${x?.complaint?.heading}</p>
+      <br>
+      <p class="mb-0" style= "line-break:anywhere;text-align: justify;">${x?.complaint?.content}</p>
+      <br>
+      <p class="mb-0" style= "line-break:anywhere;text-align: justify;">${x?.complaint?.address}</p>
+
+      `;
+    } else {
+      message = `<p class="mb-0" style= "line-break:anywhere;text-align: justify;">${x?.content}</p>`;
+    }
     $(".chatMessages").append(
       `<li class=${rightMessage === 1 ? "right-message" : "left-message"}>
       <div class="conversation-list">
@@ -445,9 +561,7 @@ function addCurrentMessage(x) {
           <div class="ctext-wrap">
             <div class="ctext-wrap-content" style="
             max-width: 320px;">
-              <p class="mb-0" style= "line-break:anywhere;text-align: justify;">${
-                x?.content
-              }</p>
+            ${complaint ? complaint : message} 
               <p class="chat-time mb-0">
                 <i class="ri-time-line align-middle"></i>
                 <span class="align-middle">${x.createdAt}</span>
@@ -501,8 +615,10 @@ function addCurrentMessage(x) {
   }
 }
 
+function forwardMessage(x) {}
+
 function scrollToBottom(animated) {
-  var container = $(".chatMessages");
+  var container = $(".boxMessages");
   var scrollHeight = container[0].scrollHeight;
 
   if (animated) {
